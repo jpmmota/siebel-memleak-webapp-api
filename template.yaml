@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: Siebel eScript Memory Leak Analyzer - Serverless application
+
+Resources:
+  ## S3 buckets
+  S3UploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref UploadBucketName
+      CorsConfiguration:
+        CorsRules:
+        - AllowedHeaders:
+            - "*"
+          AllowedMethods:
+            - GET
+            - PUT
+            - HEAD
+          AllowedOrigins:
+            - "*"
+
+  S3OutputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: memleak-output
+      CorsConfiguration:
+        CorsRules:
+        - AllowedHeaders:
+            - "*"
+          AllowedMethods:
+            - GET
+            - PUT
+            - HEAD
+          AllowedOrigins:
+            - "*"
+
+  # HTTP API
+  MyApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      # CORS configuration - this is open for development only and should be restricted in prod.
+      # See https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-property-httpapi-httpapicorsconfiguration.html   
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - "*"
+        AllowOrigins:
+          - "https://jpmota.net/"
+        MaxAge: 3600
+
+  ## Lambda functions
+  UploadRequestFunction:
+    # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Type: AWS::Serverless::Function 
+    Properties:
+      FunctionName: s3-get-signed-url
+      CodeUri: getSignedURL/
+      Handler: app.handler
+      Runtime: nodejs12.x
+      Timeout: 3
+      MemorySize: 128
+      Environment:
+        Variables:
+          UploadBucket: !Ref UploadBucketName  
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref UploadBucketName
+        ## This permission allows the Lambda function to request signed URLs
+        ## for objects that will be publicly readable. Uncomment if you want this ACL.
+        # - Statement:
+        #   - Effect: Allow
+        #     Resource: !Sub 'arn:aws:s3:::${S3UploadBucket}/'
+        #     Action:
+        #       - s3:putObjectAcl
+      Events:
+        UploadAssetAPI:
+          Type: HttpApi
+          Properties:
+            Path: /uploads
+            Method: get
+            ApiId: !Ref MyApi  
+
+  ## Lambda functions
+  MemLeakAnalyzer:
+    Type: AWS::Serverless::Function 
+    Properties:
+      FunctionName: escript-memleak-analyzer
+      CodeUri: MemLeakAnalyzer/
+      Handler: memleak_lambda.lambda_handler
+      Runtime: python3.8
+      Timeout: 90
+      MemorySize: 128
+      Environment:
+        Variables:
+          UploadBucket: memleak-upload
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - S3ReadPolicy:
+            BucketName: !Ref UploadBucketName
+        - S3FullAccessPolicy:
+            BucketName: !Ref S3OutputBucket
+      Events:
+        UploadAssetAPI:
+          Type: HttpApi
+          Properties:
+            Path: /escript-memleak-analyzer
+            Method: POST
+            ApiId: !Ref MyApi
+      #   S3Event:
+      #     Type: S3
+      #     Properties:
+      #       Bucket: !Ref S3UploadBucket
+      #       Events: s3:ObjectCreated:*
+
+  # ## This Permission is required to have Lambda trigger created
+  # ## More info: https://github.com/aws/serverless-application-model/issues/300
+  # LambdaInvokePermission:
+  #   Type: 'AWS::Lambda::Permission'
+  #   Properties:
+  #     FunctionName: !GetAtt MemLeakAnalyzer.Arn
+  #     Action: 'lambda:InvokeFunction'
+  #     Principal: 's3.amazonaws.com'
+  #     SourceAccount: !Sub ${AWS::AccountId}
+  #     SourceArn: !GetAtt S3UploadBucket.Arn
+
+## Parameters
+Parameters:
+  UploadBucketName:
+    Default: memleak-upload
+    Type: String
+
+## Take a note of the outputs for deploying the workflow templates in this sample application
+Outputs:
+  APIendpoint:
+    Description: "HTTP API endpoint URL - Update frontend html"
+    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com"
+  S3UploadBucketName:
+    Description: "S3 bucket for application uploads"
+    Value: !Ref UploadBucketName
+
