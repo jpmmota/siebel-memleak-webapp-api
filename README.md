@@ -36,7 +36,7 @@ https://jpmota.net/memleak
 
 Export eScripts from your Siebel Repository by running below SQL depending on your current version:
 
-+++ BEFORE IP17 +++
+## BEFORE IP17
 ```
 select 'APPLET', applet.name, script.created, script.created_by, script.last_upd, script.last_upd_by, script.name, script.script from SIEBEL.S_APPL_WEBSCRPT script, SIEBEL.S_APPLET applet where applet.row_id = SCRIPT.APPLET_ID and SCRIPT.REPOSITORY_ID = (select ROW_ID from siebel.s_repository where name = 'Siebel Repository') and applet.inactive_flg = 'N' and script.inactive_flg = 'N' UNION ALL
 select 'APPLICATION', application.NAME, script.created, script.created_by, script.last_upd, script.last_upd_by, script.name, script.script from SIEBEL.S_APPL_SCRIPT script, SIEBEL.S_APPLICATION application where script.REPOSITORY_ID = (select ROW_ID from siebel.s_repository where name = 'Siebel Repository') and script.application_id = application.row_id and application.inactive_flg = 'N' and script.inactive_flg = 'N' UNION ALL
@@ -44,7 +44,7 @@ select 'BUSINESS COMPONENT', BC.NAME, script.created, script.created_by, script.
 select 'BUSINESS SERVICE', BS.NAME, script.created, script.created_by, script.last_upd, script.last_upd_by, script.name, script.script from SIEBEL.S_SERVICE_SCRPT script, SIEBEL.S_SERVICE BS where script.REPOSITORY_ID = (select ROW_ID from siebel.s_repository where name = 'Siebel Repository') and bs.row_id = SCRIPT.SERVICE_ID and BS.inactive_flg = 'N' and script.inactive_flg = 'N'
 ```
 
-+++ AFTER IP17 +++
+## AFTER IP17
 ```
 select 'APPLET', applet.name, script.created, script.created_by, script.last_upd, script.last_upd_by, script.name, script.script from SIEBEL.S_APPL_WEBSCRPT script, SIEBEL.S_APPLET applet where applet.row_id = SCRIPT.APPLET_ID and SCRIPT.REPOSITORY_ID = (select WKS.repository_id from SIEBEL.S_WORKSPACE WKS where WKS.NAME='MAIN' and WKS.REPOSITORY_ID = (select row_id from S_REPOSITORY where NAME = 'Siebel Repository')) and applet.inactive_flg = 'N' and script.inactive_flg = 'N' UNION ALL
 select 'APPLICATION', application.NAME, script.created, script.created_by, script.last_upd, script.last_upd_by, script.name, script.script from SIEBEL.S_APPL_SCRIPT script, SIEBEL.S_APPLICATION application where script.REPOSITORY_ID = (select repository_id from SIEBEL.S_WORKSPACE where NAME='MAIN' and REPOSITORY_ID = (select row_id from SIEBEL.S_REPOSITORY where NAME = 'Siebel Repository')) and script.application_id = application.row_id and application.inactive_flg = 'N' and script.inactive_flg = 'N' UNION ALL
