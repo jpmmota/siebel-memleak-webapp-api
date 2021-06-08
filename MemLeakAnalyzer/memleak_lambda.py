@@ -58,7 +58,10 @@ def lambda_handler(event, context):
     if result_msg == "Unable to open input file": result_code = 500
 
     # Analyze /tmp/input_file.csv for memleak candidates
-    output_file = memleak.Main(OUTPUT_FILE_PATH + input_file)
+    try:
+        output_file = memleak.Main(OUTPUT_FILE_PATH + input_file)
+    except Exception as e:
+        print(e)
 
     # Upload output file to S3OutputBucket
     save_output_file(output_bucket,  output_file)
